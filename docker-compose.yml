@@ -1,0 +1,78 @@
+# Версия docker-compose
+version: '2'
+# Список наших сервисов (контейнеров)
+services:
+    nginx:
+        # используем последний стабильный образ nginx
+        image: nginx:latest
+        # маршрутизируем порты
+        ports:
+            - "80:80"
+        # монтируем директории, слева директории на основной машине, справа - куда они монтируются в контейнере
+        volumes:
+            - ./hosts:/etc/nginx/conf.d
+            - ./www:/var/www
+            - ./logs:/var/log/nginx
+        # nginx должен общаться с php контейнером
+        links:
+            - php
+    php:
+        # у нас свой образ для PHP, указываем путь к нему и говорим что его надо собрать
+        build: ./images/php
+        # этот образ будет общаться с mysql
+        links:
+            - mysql
+            - redis
+        # монтируем директорию с проектами
+        volumes:
+            - ./www:/var/www
+        environment:
+            - "DB_PORT=3306"
+            - "DB_HOST=mysql"
+            - "REDIS_PORT=6379"
+            - "REDIS_HOST=redis"
+    php-cli:
+        build: ./images/php-cli
+        volumes:
+            - ./www/aniq.test:/var/www/aniq.test
+        links:
+            - mysql
+            - redis
+        environment:
+            - "DB_PORT=3306"
+            - "DB_HOST=mysql"
+            - "REDIS_PORT=6379"
+            - "REDIS_HOST=redis"
+        tty: true
+    mysql:
+        image: mysql:5.7
+        volumes:
+            - ./mysql:/var/lib/mysql
+        environment:
+            - "MYSQL_ROOT_PASSWORD=secret"
+            - "MYSQL_USER=app"
+            - "MYSQL_PASSWORD=secret"
+            - "MYSQL_DATABASE=app"
+            - "MYSQL_PORT_3306_TCP_ADDR=mysql"
+            - "MYSQL_PORT_3306_TCP_PORT=3306"
+        ports:
+            - "3306:3306"
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        links:
+            - mysql:db
+        environment:
+            PMA_HOST: mysql
+            PMA_PORT: 3306
+        ports:
+            - '8081:80'
+    redis:
+        image: redis:3.0
+        ports:
+            - "6379:6379"
+    node:
+        image: node:8.14.0-jessie
+        volumes:
+            - ./www/aniq.test:/var/www/aniq.test
+        working_dir: /var/www/aniq.test
+        tty: true
